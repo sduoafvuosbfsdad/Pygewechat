@@ -1,5 +1,5 @@
 from .logger import logger
 from .main import GeWechatClient
-from . import Objects
+import Objects
 
 __all__ = ['logger', 'GeWechatClient', 'Objects']
