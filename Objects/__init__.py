@@ -1,2 +1,2 @@
-from .main import *
-__all__ = ['User', 'TextMessage', 'parse_interaction']
+from . import entities, messages
+__all__ = ['entities', 'messages']
