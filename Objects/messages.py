@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod, abstractproperty
 
 import base64
 
+
 class Message(ABC):
     @abstractmethod
     def __init__(self, content, sender, receiver):
@@ -11,13 +12,18 @@ class Message(ABC):
     def parse(data:dict):
         if data['TypeName'] == 'AddMsg':
             if data['Data']['MsgType'] == 1:
-                return TextMessage.from_json(
+                obj = TextMessage.from_json(
                     data['Data']
                 )
             elif  data['Data']['MsgType'] == 3:
-                return ImageMessage.from_json(
+                obj = ImageMessage.from_json(
                     data['Data']
                 )
+        if obj is not None:
+            obj.app_id = data['Appid']
+            obj.Wxid = data['Wxid']
+            return obj
+        return None
 
 class TextMessage(Message):
     """
