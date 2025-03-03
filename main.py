@@ -79,7 +79,7 @@ class Client:
             header={}
         )['data']
 
-    def send(self, receiver:entities.User, app_id:str, message:str):
+    def send(self, channel:entities.Channel, app_id:str, message:str):
         """
         This function helps to send messages to people.
 
@@ -92,7 +92,7 @@ class Client:
             '/message/postText',
             {
                 'appId': app_id,
-                'toWxid': receiver.id,
+                'toWxid': channel.id,
                 'content': message
             }
         )
