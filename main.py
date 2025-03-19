@@ -9,14 +9,6 @@ class Client:
         self.app_id = app_id
 
     def send(self, receiver:entities.User, message:str):
-        """
-        This function helps to send messages to people.
-
-        :warning: Currently you can only send text messages. This under development.
-        :param receiver:
-        :param message:
-        :return:
-        """
         self._post(
             '/message/postText',
             {
@@ -27,15 +19,6 @@ class Client:
         )
 
     def _post(self, path:str, payload:dict, header:dict = None, *, default_header:bool = True):
-        """
-        Internal method to send POST request to gewe api.
-
-        :param path:
-        :param payload:
-        :param header:
-        :param default_header:
-        :return:
-        """
         response = requests.post(
             self.base_url + path,
             data = json.dumps(payload),
