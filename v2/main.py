@@ -3,7 +3,34 @@ import requests
 from urllib.parse import urljoin
 
 import fastapi, uvicorn
-from typing import Dict
+from typing import Dict, Literal
+
+import Objects
+
+class EventHandler:
+    def __init__(self):
+        self.on_text_message = None
+        self.on_image_message = None
+        self.on_message = None
+
+    def handle(self, data:dict):
+        try:
+            data = Objects.parse_event(data)
+            if isinstance(data, Objects.Messages.Message):
+                if isinstance(data, Objects.Messages.TextMessage):
+                    if self.on_text_message is not None:
+                        self.on_text_message(data)
+                        return
+                elif isinstance(data, Objects.Messages.ImageMessage):
+                    if self.on_image_message is not None:
+                        self.on_image_message(data)
+                        return
+                if self.on_message is not None:
+                    self.on_message(data)
+                    return
+
+        except NotImplementedError:
+            return
 
 class Client:
     def __init__(self, base_url:str, app_id:str):
@@ -23,6 +50,10 @@ class Client:
             }
         )
 
+        Objects.Messages.RequestConfig.Session = self.session
+        Objects.Messages.RequestConfig.app_id = app_id
+        Objects.Messages.RequestConfig.url = self.base_url
+
         #Attaining the token from the url
         response = self.session.post(
             urljoin(base_url, '/tools/getTokenId'),
@@ -37,11 +68,14 @@ class Client:
             }
         )
 
+        #Starting the event handler
+        self.event_handler = EventHandler()
+
         #Setting up the FastAPI callback server
         self.app = fastapi.FastAPI()
         @self.app.post('/')
         def runtime(data:Dict):
-            print(data)
+            self.event_handler.handle(data)
             return fastapi.responses.PlainTextResponse(
                 'Jinitaimei :D',
                 status_code = 200,
@@ -53,3 +87,13 @@ class Client:
             host = 'localhost',
             port = port
         )
+
+    def event(self, target:Literal['on_message']):
+        def decorater(func:callable):
+            assert hasattr(self.event_handler, target)
+            self.event_handler.__setattr__(target, func)
+
+            def wrapper(*args, **kwargs):
+                return func(*args, **kwargs)
+            return wrapper
+        return decorater
