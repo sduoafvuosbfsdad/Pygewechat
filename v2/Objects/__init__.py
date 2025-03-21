@@ -22,8 +22,9 @@ def parse_event(data:dict):
     if channel.is_dm:
         sender = Utils.get_by_id(Misc.User, id = data['FromUserName']['string'])
     elif channel.is_chatroom:
-        sender, content = content.splt(':', 2)
-        sender = Utils.get_by_id(Misc.User, id = sender.id)
+        sender, content = content.split(':', 2)
+        sender = Utils.get_by_id(Misc.User, id = sender)
+        content = content.strip()
     MsgType = data['MsgType']
     created_at = data['CreateTime']
     msg_id = data['MsgId']

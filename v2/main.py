@@ -20,10 +20,16 @@ class EventHandler:
             data = Objects.parse_event(data)
             if isinstance(data, Objects.Messages.Message):
                 if isinstance(data, Objects.Messages.TextMessage):
+                    print(f'[TextMessage] [{data.sender.id} -> {data.channel.id}] {data.content}')
                     for i in CommandTree.prefixes.keys():
                         if data.content.startswith(i):
-                            CommandTree.prefixes[i].parse(data)
-
+                            cmd = CommandTree.prefixes[i].parse(data)
+                            if cmd is not None:
+                                Client._instance.send_text(
+                                    channel = data.channel,
+                                    content = str(cmd())
+                                )
+                                return
                     if self.on_text_message is not None:
                         self.on_text_message(data)
                         return
@@ -37,14 +43,6 @@ class EventHandler:
 
         except NotImplementedError:
             return
-
-class Command:
-    def __init__(self, func:callable, description:str):
-        self.func = func
-        self.description = description
-
-    def __call__(self, *args, **kwargs):
-        return self.func(*args, **kwargs)
 
 class CommandTree:
     prefixes = {}
@@ -61,17 +59,12 @@ class CommandTree:
         self.commands = {}
         self.help = 'Oops sorry there is no help here :('
 
-    def command(self, *, cmd_name:str = None, description:str):
+    def command(self, cmd_name:str = None):
         def decorator(func:callable):
             name = cmd_name if cmd_name is not None else func.__name__
             name = name.strip()
             assert not ' ' in name
-
-            command = Command(
-                func = func,
-                description = description
-            )
-            self.commands[name] = command
+            self.commands[name] = func
             def wrapper(*args, **kwargs):
                 return func(*args, **kwargs)
             return wrapper
@@ -82,12 +75,15 @@ class CommandTree:
         elements = target.split(' ')
         if elements[0] in self.commands.keys():
             command = self.commands[elements[0]]
-            return lambda: command(*elements[1:])
+            return lambda: command(*elements[1:], **{'interaction': data})
         else:
             return None
 
 class Client:
+    _instance = None
     def __init__(self, base_url:str, download_url:str, app_id:str):
+        assert self._instance is None
+        Client._instance = self
         #Validate the link
         self.session = requests.Session()
         try:
@@ -115,7 +111,6 @@ class Client:
             data = {}
         )
         response.raise_for_status()
-        print(response.json())
         self.token = response.json()['data']
         self.session.headers.update(
             {
@@ -131,7 +126,6 @@ class Client:
         self.app = fastapi.FastAPI()
         @self.app.post('/')
         def runtime(data:Dict):
-            print(data)
             self.event_handler.handle(data)
             return fastapi.responses.PlainTextResponse(
                 'Jinitaimei :D',
@@ -155,7 +149,7 @@ class Client:
             return wrapper
         return decorater
 
-    def send_text(self, channel:Objects.Misc.Channel, content:str, mention:list[Objects.Misc.User] | str):
+    def send_text(self, channel:Objects.Misc.Channel, content:str, mention:list[Objects.Misc.User] | str = []):
         ats = []
         if isinstance(mention, list):
             for i in mention:
@@ -176,5 +170,5 @@ class Client:
         )
         response.raise_for_status()
         response = response.json()
-        if response['ret'] != '200':
+        if response['ret'] != 200:
             raise requests.exceptions.HTTPError(response)
