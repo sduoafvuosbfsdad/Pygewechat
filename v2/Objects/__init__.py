@@ -8,21 +8,24 @@ class Utils:
     @staticmethod
     def get_by_id(obj, *, id:str):
         assert obj in [Misc.Channel, Misc.User]
-        for i in obj.instances:
+        for i in obj._instances:
             if i.id == id:
                 return i
-        return obj(i)
+        return obj(id)
 
 def parse_event(data:dict):
     app_id = data['Appid']
     wxid = data['Wxid']
     data = data['Data']
     content = data['Content']['string']
-    sender = Utils.get_by_id(Misc.User, id = data['FromUserName']['string'])
-    channel = Utils.get_by_id(Misc.Channel, id = data['ToUserName']['string'])
+    channel  = Utils.get_by_id(Misc.Channel, id = data['FromUserName']['string'])
+    if channel.is_dm:
+        sender = Utils.get_by_id(Misc.User, id = data['FromUserName']['string'])
+    elif channel.is_chatroom:
+        sender, content = content.splt(':', 2)
+        sender = Utils.get_by_id(Misc.User, id = sender.id)
     MsgType = data['MsgType']
     created_at = data['CreateTime']
-    push = data['PushContent']
     msg_id = data['MsgId']
     new_msg_id = data['NewMsgId']
 
@@ -34,7 +37,6 @@ def parse_event(data:dict):
             sender = sender,
             channel = channel,
             created_at = created_at,
-            push = push,
             msg_id = msg_id,
             new_msg_id = new_msg_id,
         )
@@ -46,7 +48,6 @@ def parse_event(data:dict):
             sender=sender,
             channel=channel,
             created_at=created_at,
-            push=push,
             msg_id=msg_id,
             new_msg_id=new_msg_id,
         )

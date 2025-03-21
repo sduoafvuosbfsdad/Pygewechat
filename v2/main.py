@@ -4,7 +4,7 @@ from urllib.parse import urljoin
 import fastapi, uvicorn
 from typing import Dict, Literal
 
-import Objects
+from . import Objects
 
 class EventHandler:
     def __init__(self):
@@ -32,7 +32,7 @@ class EventHandler:
             return
 
 class Client:
-    def __init__(self, base_url:str, app_id:str):
+    def __init__(self, base_url:str, download_url:str, app_id:str):
         #Validate the link
         self.session = requests.Session()
         try:
@@ -41,7 +41,7 @@ class Client:
             raise ConnectionRefusedError(f'{base_url}is a invalid link') from e
 
         #Storing the params
-        self.base_url = urljoin(base_url, '/v2/api')
+        self.base_url = urljoin(base_url, 'v2/api/')
         self.app_id = app_id
         self.session.headers.update(
             {
@@ -52,13 +52,15 @@ class Client:
         Objects.Messages.RequestConfig.Session = self.session
         Objects.Messages.RequestConfig.app_id = app_id
         Objects.Messages.RequestConfig.url = self.base_url
+        Objects.Messages.RequestConfig.download_url = download_url
 
         #Attaining the token from the url
         response = self.session.post(
-            urljoin(base_url, '/tools/getTokenId'),
+            urljoin(self.base_url, 'tools/getTokenId'),
             data = {}
         )
         response.raise_for_status()
+        print(response.json())
         self.token = response.json()['data']
         self.session.headers.update(
             {
@@ -74,6 +76,7 @@ class Client:
         self.app = fastapi.FastAPI()
         @self.app.post('/')
         def runtime(data:Dict):
+            print(data)
             self.event_handler.handle(data)
             return fastapi.responses.PlainTextResponse(
                 'Jinitaimei :D',
@@ -83,11 +86,11 @@ class Client:
     def run(self, port:int = 2533):
         uvicorn.run(
             self.app,
-            host = 'localhost',
+            host = '0.0.0.0',
             port = port
         )
 
-    def event(self, target:Literal['on_message']):
+    def event(self, target):
         def decorater(func:callable):
             assert hasattr(self.event_handler, target)
             self.event_handler.__setattr__(target, func)
