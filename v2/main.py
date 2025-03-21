@@ -2,9 +2,12 @@ import requests
 from urllib.parse import urljoin
 
 import fastapi, uvicorn
-from typing import Dict, Literal
+from typing import Dict, Literal, Union
 
 from . import Objects
+
+class ExtraArgumentsError(Exception):
+    pass
 
 class EventHandler:
     def __init__(self):
@@ -17,6 +20,10 @@ class EventHandler:
             data = Objects.parse_event(data)
             if isinstance(data, Objects.Messages.Message):
                 if isinstance(data, Objects.Messages.TextMessage):
+                    for i in CommandTree.prefixes.keys():
+                        if data.content.startswith(i):
+                            CommandTree.prefixes[i].parse(data)
+
                     if self.on_text_message is not None:
                         self.on_text_message(data)
                         return
@@ -30,6 +37,54 @@ class EventHandler:
 
         except NotImplementedError:
             return
+
+class Command:
+    def __init__(self, func:callable, description:str):
+        self.func = func
+        self.description = description
+
+    def __call__(self, *args, **kwargs):
+        return self.func(*args, **kwargs)
+
+class CommandTree:
+    prefixes = {}
+    class Argument:
+        def __init__(self, var_type:Union[str, int, float, bool], description:str):
+            self.var_type = var_type
+            self.description = description
+
+    def __init__(self, prefix:str):
+        assert ' ' not in prefix
+        assert prefix not in self.prefixes.keys()
+        self.prefix = prefix
+        self.prefixes[prefix] = self
+        self.commands = {}
+        self.help = 'Oops sorry there is no help here :('
+
+    def command(self, *, cmd_name:str = None, description:str):
+        def decorator(func:callable):
+            name = cmd_name if cmd_name is not None else func.__name__
+            name = name.strip()
+            assert not ' ' in name
+
+            command = Command(
+                func = func,
+                description = description
+            )
+            self.commands[name] = command
+            def wrapper(*args, **kwargs):
+                return func(*args, **kwargs)
+            return wrapper
+        return decorator
+
+    def parse(self, data:Objects.Messages.TextMessage):
+        target = data.content[len(self.prefix):]
+        elements = target.split(' ')
+        if elements[0] in self.commands.keys():
+            command = self.commands[elements[0]]
+            return lambda: command(*elements[1:])
+        else:
+            return None
 
 class Client:
     def __init__(self, base_url:str, download_url:str, app_id:str):
@@ -99,3 +154,27 @@ class Client:
                 return func(*args, **kwargs)
             return wrapper
         return decorater
+
+    def send_text(self, channel:Objects.Misc.Channel, content:str, mention:list[Objects.Misc.User] | str):
+        ats = []
+        if isinstance(mention, list):
+            for i in mention:
+                assert isinstance(i, Objects.Misc.User)
+                ats.append(i)
+        elif isinstance(mention, str):
+            if 'all' in mention:
+                ats.append('notify@all')
+
+        response = self.session.post(
+            urljoin(self.base_url, 'message/postText'),
+            json = {
+                'appId': self.app_id,
+                'toWxid': channel.id,
+                'content': content,
+                'ats': ','.join(ats)
+            }
+        )
+        response.raise_for_status()
+        response = response.json()
+        if response['ret'] != '200':
+            raise requests.exceptions.HTTPError(response)

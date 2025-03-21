@@ -1,4 +1,4 @@
 from . import Objects
-from .main import Client
+from .main import Client, CommandTree
 
-__all__ = ['Objects', 'Client']
+__all__ = ['Objects', 'Client', 'CommandTree']
